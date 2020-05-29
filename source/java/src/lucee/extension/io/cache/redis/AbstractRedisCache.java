@@ -41,6 +41,7 @@ public abstract class AbstractRedisCache extends CacheSupport {
 	private int maxIdle;
 	private int minIdle;
 	private int defaultExpire;
+	private String namespace;
 	private ClassLoader cl;
 
 	public void init(Config config, String[] cacheName, Struct[] arguments) {
@@ -56,6 +57,9 @@ public abstract class AbstractRedisCache extends CacheSupport {
 		if (Util.isEmpty(password)) password = null;
 
 		defaultExpire = caster.toIntValue(arguments.get("timeToLiveSeconds", null), 0);
+
+		namespace = caster.toString(arguments.get("namespace", null), null);
+		if (Util.isEmpty(namespace)) namespace = null;
 
 		// for config
 		maxTotal = caster.toIntValue(arguments.get("maxTotal", null), 0);
@@ -116,18 +120,27 @@ public abstract class AbstractRedisCache extends CacheSupport {
 		Jedis conn = jedisSilent();
 		try {
 			byte[] bkey = toKey(key);
-			conn.set(bkey, serialize(val));
 
-			int ex = 0;
+			int ex = defaultExpire;
+
 			if (expire != null) {
 				ex = (int) (expire / 1000);
 			}
-			else {
-				ex = defaultExpire;
+			else if (idle != null) {
+				// note: if this cache is being used as a session store
+				// then idle will be passed in as -1 when a new session
+				// is created and first stored. Avoid setting `ex` in
+				// this case so we don't get a cache item without a TTL
+				// when the cache has a default TTL
+				if (idle >= 0) {
+					ex = (int) (idle / 1000);
+				}
 			}
 
 			if (ex > 0) {
-				conn.expire(bkey, ex);
+				conn.setex(bkey, ex, serialize(val));
+			} else {
+				conn.set(bkey, serialize(val));
 			}
 		}
 		catch (PageException e) {
@@ -190,7 +203,7 @@ public abstract class AbstractRedisCache extends CacheSupport {
 	public List<String> keys() throws IOException {
 		Jedis conn = jedis();
 		try {
-			return toList(conn.keys("*"));
+			return _skeys(conn, (CacheKeyFilter) null);
 		}
 		finally {
 			RedisCacheUtils.close(conn);
@@ -214,26 +227,26 @@ public abstract class AbstractRedisCache extends CacheSupport {
 
 	private List<byte[]> _bkeys(Jedis conn, CacheKeyFilter filter) throws IOException {
 		boolean all = CacheUtil.allowAll(filter);
-		Set<byte[]> skeys = conn.keys("*".getBytes(UTF8));
+		Set<byte[]> skeys = conn.keys(toKey("*"));
 		List<byte[]> list = new ArrayList<byte[]>();
 		Iterator<byte[]> it = skeys.iterator();
 		byte[] key;
 		while (it.hasNext()) {
 			key = it.next();
-			if (all || filter.accept(new String(key, UTF8))) list.add(key);
+			if (all || filter.accept(RedisCacheUtils.removeNamespace(namespace, new String(key, UTF8)))) list.add(key);
 		}
 		return list;
 	}
 
 	private List<String> _skeys(Jedis conn, CacheKeyFilter filter) throws IOException {
 		boolean all = CacheUtil.allowAll(filter);
-		Set<byte[]> skeys = conn.keys("*".getBytes(UTF8));
+		Set<byte[]> skeys = conn.keys(toKey("*"));
 		List<String> list = new ArrayList<String>();
 		Iterator<byte[]> it = skeys.iterator();
 		byte[] key;
 		while (it.hasNext()) {
 			key = it.next();
-			if (all || filter.accept(new String(key, UTF8))) list.add(new String(key, UTF8));
+			if (all || filter.accept(RedisCacheUtils.removeNamespace(namespace, new String(key, UTF8)))) list.add(RedisCacheUtils.removeNamespace(namespace, new String(key, UTF8)));
 		}
 		return list;
 	}
@@ -260,7 +273,7 @@ public abstract class AbstractRedisCache extends CacheSupport {
 												// because it is much faster than the else solution
 				int i = 0;
 				for (byte[] val: values) {
-					list.add(new RedisCacheEntry(this, keys[i++], evaluate(val), val.length));
+					list.add(new RedisCacheEntry(this, RedisCacheUtils.removeNamespace(namespace, new String(keys[i++], UTF8)).getBytes(UTF8), evaluate(val), val.length));
 				}
 			}
 			else {
@@ -271,7 +284,7 @@ public abstract class AbstractRedisCache extends CacheSupport {
 						val = conn.get(key);
 					}
 					catch (JedisDataException jde) {}
-					if (val != null) list.add(new RedisCacheEntry(this, key, evaluate(val), val.length));
+					if (val != null) list.add(new RedisCacheEntry(this, RedisCacheUtils.removeNamespace(namespace, new String(key, UTF8)).getBytes(UTF8), evaluate(val), val.length));
 				}
 			}
 			return list;
@@ -335,11 +348,11 @@ public abstract class AbstractRedisCache extends CacheSupport {
 	/*
 	 * private List entriesList(List keys) throws IOException { Jedis conn = jedis();
 	 * ArrayList<RedisCacheEntry> res = null;
-	 * 
+	 *
 	 * try { res = new ArrayList<RedisCacheEntry>(); Iterator<String> it = keys.iterator(); while
 	 * (it.hasNext()) { String k = it.next(); res.add(new RedisCacheEntry(this, new RedisCacheItem(k,
 	 * conn.get(k), settings.cacheName))); }
-	 * 
+	 *
 	 * } finally { RedisCacheUtils.close(conn); } return res; }
 	 */
 
@@ -348,15 +361,6 @@ public abstract class AbstractRedisCache extends CacheSupport {
 	 * keys.size(); i++) { keys.set(i, RedisCacheUtils.removeNamespace(settings.nameSpace,
 	 * keys.get(i))); } return keys; }
 	 */
-
-	private List<String> toList(Set<String> keys) throws IOException {
-		List<String> list = new ArrayList<String>();
-		Iterator<String> it = keys.iterator();
-		while (it.hasNext()) {
-			list.add(it.next());
-		}
-		return list;
-	}
 
 	// CachePro interface @Override
 	public Cache decouple() {
@@ -371,21 +375,17 @@ public abstract class AbstractRedisCache extends CacheSupport {
 
 	@Override
 	public int clear() throws IOException {
-		Jedis conn = jedis();
-		Set<String> set = conn.keys("*");
-		String[] keys = engine.getListUtil().toStringArray(set);
-		if (keys.length == 0) return 0;
-		return engine.getCastUtil().toIntValue(conn.del(keys), 0);
+		return remove((CacheKeyFilter) null);
 	}
 
 	private byte[] toKey(String key) {
-		return key.trim().toLowerCase().getBytes(UTF8);
+		return RedisCacheUtils.addNamespace(namespace, key.trim().toLowerCase()).getBytes(UTF8);
 	}
 
 	private byte[][] toKeys(String[] keys) {
 		byte[][] arr = new byte[keys.length][];
 		for (int i = 0; i < keys.length; i++) {
-			arr[i] = keys[i].trim().toLowerCase().getBytes(UTF8);
+			arr[i] = RedisCacheUtils.addNamespace(namespace, keys[i].trim().toLowerCase()).getBytes(UTF8);
 		}
 		return arr;
 	}
@@ -398,7 +398,11 @@ public abstract class AbstractRedisCache extends CacheSupport {
 			return ois.readObject();
 		}
 		catch (Exception e) {
-			throw CFMLEngineFactory.getInstance().getCastUtil().toPageException(e);
+			try {
+				return new String(data, UTF8);
+			} catch ( Exception innerE ) {
+				throw CFMLEngineFactory.getInstance().getCastUtil().toPageException(e);
+			}
 		}
 		finally {
 			Util.closeEL(ois);

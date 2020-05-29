@@ -18,8 +18,8 @@ component extends="Cache" {
 			displayName = "Namespace",
 			name = "namespace",
 			defaultValue = "lucee:cache",
-			required = true,
-			description = "Keys namespace. Be sure that any cache use a unique namespace to avoid keys names clashing."
+			required = false,
+			description = "Keys namespace. If using the same Redis instance for more than one cache use a unique namespace to avoid keys names clashing."
 		)
 
 		,group("Authentication","Authentication Credentials if necessary.")
@@ -33,7 +33,7 @@ component extends="Cache" {
 
 		,group("Time Management","")
 		,field("Time to live in seconds","timeToLiveSeconds","0",true,"Sets the timeout to live for an element before it expires. If all fields are set to 0 the element live as long the server live.","time")
-		
+
 		,group("Pool","Connection to Redis are handled within a Pool, the following settings allows you to configure this pool.")
 		,field(displayName = "Max Total",
 			name = "maxTotal",
