@@ -15,8 +15,6 @@ import lucee.commons.io.cache.CacheEntry;
 import lucee.commons.io.cache.CacheKeyFilter;
 import lucee.commons.io.cache.exp.CacheException;
 import lucee.extension.io.cache.util.ObjectInputStreamImpl;
-import lucee.extension.util.FunctionFactory;
-import lucee.extension.util.Functions;
 import lucee.loader.engine.CFMLEngine;
 import lucee.loader.engine.CFMLEngineFactory;
 import lucee.loader.util.Util;
@@ -30,7 +28,6 @@ import redis.clients.jedis.exceptions.JedisDataException;
 
 public abstract class AbstractRedisCache extends CacheSupport {
 
-	public Functions func;
 	protected CFMLEngine engine = CFMLEngineFactory.getInstance();
 	protected Cast caster = engine.getCastUtil();
 
@@ -51,7 +48,6 @@ public abstract class AbstractRedisCache extends CacheSupport {
 
 	public void init(Struct arguments) throws IOException {
 		this.cl = arguments.getClass().getClassLoader();
-		func = FunctionFactory.getInstance();
 		timeout = caster.toIntValue(arguments.get("timeout", null), 2000);
 		password = caster.toString(arguments.get("password", null), null);
 		if (Util.isEmpty(password)) password = null;
