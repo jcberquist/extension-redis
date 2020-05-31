@@ -3,6 +3,5 @@ Export-Package: lucee.extension.io.cache.redis.simple,
  lucee.extension.io.cache.redis.sentinel
 Bundle-ManifestVersion: 2
 Require-Bundle: redis.clients.jedis;bundle-version=3.3.0,
- org.lucee.oro;bundle-version=2.0.8,
  org.apache.commons.commons-pool2;bundle-version=2.6.2,
  slf4j.api;bundle-version=1.7.30
