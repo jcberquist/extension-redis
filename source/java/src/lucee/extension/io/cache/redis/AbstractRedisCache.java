@@ -76,15 +76,11 @@ public abstract class AbstractRedisCache implements Cache {
         try {
             byte[] bkey = toJedisKey(skey);
             byte[] val = null;
-            try {
-                val = conn.get(bkey);
-            }
-            catch (JedisDataException jde) {
-                String msg = jde.getMessage() + "";
-                if (msg.startsWith("WRONGTYPE")) val = conn.lpop(bkey);
-            }
+
+            val = conn.get(bkey);
             if (val == null) throw new IOException("Cache key [" + skey + "] does not exists");
-            return new RedisCacheEntry(this, bkey, evaluate(val), val.length);
+
+            return new RedisCacheEntry(this, skey, evaluate(val), val.length);
         }
         catch (PageException e) {
             throw new RuntimeException(e);// not throwing IOException because Lucee 4.5
