@@ -38,12 +38,12 @@ public abstract class AbstractRedisCache implements Cache {
     protected int timeout;
     protected String password;
 
+    private ClassLoader cl;
+    private int defaultExpire;
+    private String namespace;
     private int maxTotal;
     private int maxIdle;
     private int minIdle;
-    private int defaultExpire;
-    private String namespace;
-    private ClassLoader cl;
 
     public void init(Struct arguments) throws IOException {
         this.cl = arguments.getClass().getClassLoader();
@@ -52,15 +52,12 @@ public abstract class AbstractRedisCache implements Cache {
         if (Util.isEmpty(password)) password = null;
 
         defaultExpire = caster.toIntValue(arguments.get("timeToLiveSeconds", null), 0);
-
         namespace = caster.toString(arguments.get("namespace", null), null);
         if (Util.isEmpty(namespace)) namespace = null;
 
-        // for config
         maxTotal = caster.toIntValue(arguments.get("maxTotal", null), 0);
         maxIdle = caster.toIntValue(arguments.get("maxIdle", null), 0);
         minIdle = caster.toIntValue(arguments.get("minIdle", null), 0);
-
     }
 
     protected JedisPoolConfig getJedisPoolConfig() throws IOException {
@@ -77,7 +74,7 @@ public abstract class AbstractRedisCache implements Cache {
     public CacheEntry getCacheEntry(String skey) throws IOException {
         Jedis conn = jedisSilent();
         try {
-            byte[] bkey = toKey(skey);
+            byte[] bkey = toJedisKey(skey);
             byte[] val = null;
             try {
                 val = conn.get(bkey);
@@ -123,7 +120,7 @@ public abstract class AbstractRedisCache implements Cache {
     public void put(String key, Object val, Long idle, Long expire) {
         Jedis conn = jedisSilent();
         try {
-            byte[] bkey = toKey(key);
+            byte[] bkey = toJedisKey(key);
 
             int ex = defaultExpire;
 
@@ -159,7 +156,7 @@ public abstract class AbstractRedisCache implements Cache {
     public boolean contains(String key) {
         Jedis conn = jedisSilent();
         try {
-            return conn.exists(toKey(key));
+            return conn.exists(toJedisKey(key));
         }
         finally {
             close(conn);
@@ -170,7 +167,7 @@ public abstract class AbstractRedisCache implements Cache {
     public boolean remove(String key) throws IOException {
         Jedis conn = jedis();
         try {
-            return conn.del(toKey(key)) > 0;
+            return conn.del(toJedisKey(key)) > 0;
         }
         finally {
             close(conn);
@@ -335,7 +332,7 @@ public abstract class AbstractRedisCache implements Cache {
                         val = conn.get(key);
                     }
                     catch (JedisDataException jde) {}
-                    if (val != null) list.add(new RedisCacheEntry(this, removeNamespace(new String(key, UTF8)).getBytes(UTF8), evaluate(val), val.length));
+                    if (val != null) list.add(new RedisCacheEntry(this, fromJedisKey(key).getBytes(UTF8), evaluate(val), val.length));
                 }
             }
             return list;
@@ -391,32 +388,36 @@ public abstract class AbstractRedisCache implements Cache {
 
     private List<byte[]> _bkeys(Jedis conn, CacheKeyFilter filter) throws IOException {
         boolean all = CacheUtil.allowAll(filter);
-        Set<byte[]> skeys = conn.keys(toKey("*"));
+        Set<byte[]> skeys = conn.keys(toJedisKey("*"));
         List<byte[]> list = new ArrayList<byte[]>();
         Iterator<byte[]> it = skeys.iterator();
         byte[] key;
         while (it.hasNext()) {
             key = it.next();
-            if (all || filter.accept(removeNamespace(new String(key, UTF8)))) list.add(key);
+            if (all || filter.accept(fromJedisKey(key))) list.add(key);
         }
         return list;
     }
 
     private List<String> _skeys(Jedis conn, CacheKeyFilter filter) throws IOException {
         boolean all = CacheUtil.allowAll(filter);
-        Set<byte[]> skeys = conn.keys(toKey("*"));
+        Set<byte[]> skeys = conn.keys(toJedisKey("*"));
         List<String> list = new ArrayList<String>();
         Iterator<byte[]> it = skeys.iterator();
         byte[] key;
         while (it.hasNext()) {
             key = it.next();
-            if (all || filter.accept(removeNamespace(new String(key, UTF8)))) list.add(removeNamespace(new String(key, UTF8)));
+            if (all || filter.accept(fromJedisKey(key))) list.add(fromJedisKey(key));
         }
         return list;
     }
 
-    private byte[] toKey(String key) {
+    private byte[] toJedisKey(String key) {
         return addNamespace(key.trim().toLowerCase()).getBytes(UTF8);
+    }
+
+    private String fromJedisKey(byte[] jkey) {
+        return removeNamespace(new String(jkey, UTF8));
     }
 
     private String addNamespace(String key) {
@@ -434,14 +435,6 @@ public abstract class AbstractRedisCache implements Cache {
             return key.replace(namespace.toLowerCase() + ":", "");
         }
         return key;
-    }
-
-    private byte[][] toKeys(String[] keys) {
-        byte[][] arr = new byte[keys.length][];
-        for (int i = 0; i < keys.length; i++) {
-            arr[i] = addNamespace(keys[i].trim().toLowerCase()).getBytes(UTF8);
-        }
-        return arr;
     }
 
     private Object evaluate(byte[] data) throws PageException {
@@ -476,13 +469,7 @@ public abstract class AbstractRedisCache implements Cache {
         }
     }
 
-    protected abstract Jedis _jedis() throws IOException;
-
-    protected Jedis jedis() throws IOException {
-        Jedis conn = _jedis();
-        if (!conn.isConnected()) conn.connect();
-        return conn;
-    }
+    protected abstract Jedis jedis() throws IOException;
 
     protected Jedis jedisSilent() {
         try {
