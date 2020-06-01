@@ -321,7 +321,7 @@ public abstract class AbstractRedisCache implements Cache {
                                                 // because it is much faster than the else solution
                 int i = 0;
                 for (byte[] val: values) {
-                    list.add(new RedisCacheEntry(this, removeNamespace(new String(keys[i++], UTF8)).getBytes(UTF8), evaluate(val), val.length));
+                    list.add(new RedisCacheEntry(this, fromJedisKey(keys[i++]), evaluate(val), val.length));
                 }
             }
             else {
@@ -332,7 +332,7 @@ public abstract class AbstractRedisCache implements Cache {
                         val = conn.get(key);
                     }
                     catch (JedisDataException jde) {}
-                    if (val != null) list.add(new RedisCacheEntry(this, fromJedisKey(key).getBytes(UTF8), evaluate(val), val.length));
+                    if (val != null) list.add(new RedisCacheEntry(this, fromJedisKey(key), evaluate(val), val.length));
                 }
             }
             return list;
