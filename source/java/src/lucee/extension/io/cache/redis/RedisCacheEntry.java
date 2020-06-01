@@ -9,13 +9,13 @@ import lucee.runtime.type.Struct;
 public class RedisCacheEntry implements CacheEntry {
 
     private final AbstractRedisCache cache;
-    private final byte[] bkey;
+    private final String key;
     private final Object value;
     private final long size;
 
-    public RedisCacheEntry(AbstractRedisCache cache, byte[] bkey, Object value, long size) {
+    public RedisCacheEntry(AbstractRedisCache cache, String key, Object value, long size) {
         this.cache = cache;
-        this.bkey = bkey;
+        this.key = key;
         this.value = value;
         this.size = size;
     }
@@ -42,7 +42,7 @@ public class RedisCacheEntry implements CacheEntry {
 
     @Override
     public String getKey() {
-        return new String(bkey, AbstractRedisCache.UTF8);
+        return key;
     }
 
     @Override
