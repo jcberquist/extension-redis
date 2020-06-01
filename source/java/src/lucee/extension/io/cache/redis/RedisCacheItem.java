@@ -9,38 +9,38 @@ public class RedisCacheItem {
     // private String cacheName;
 
     public RedisCacheItem(String key, String value) {
-	setKey(key);
-	setValue(value);
-	setHitCount(0);
+        setKey(key);
+        setValue(value);
+        setHitCount(0);
     }
 
     public RedisCacheItem(String key, String value, Integer hitCount) {
-	setKey(key);
-	setValue(value);
-	setHitCount(hitCount);
+        setKey(key);
+        setValue(value);
+        setHitCount(hitCount);
     }
 
     public Integer getHitCount() {
-	return hitCount;
+        return hitCount;
     }
 
     public void setHitCount(Integer hitCount) {
-	this.hitCount = hitCount;
+        this.hitCount = hitCount;
     }
 
     public void setKey(String key) {
-	this.key = key;
+        this.key = key;
     }
 
     public void setValue(String value) {
-	this.value = value;
+        this.value = value;
     }
 
     public String getKey() {
-	return key;
+        return key;
     }
 
     public String getValue() {
-	return value;
+        return value;
     }
 }

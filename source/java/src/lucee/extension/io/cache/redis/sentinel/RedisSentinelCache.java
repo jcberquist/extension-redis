@@ -19,16 +19,16 @@ public class RedisSentinelCache extends AbstractRedisCache {
 
     @Override
     public void init(Config config, String cacheName, Struct arguments) throws IOException {
-	super.init(arguments);
-	masterName = caster.toString(arguments.get("masterName", ""), "");
-	sentinels = CacheUtil.toSet(caster.toString(arguments.get("sentinels", ""), "").split("\\r?\\n")); // TODO better
+        super.init(arguments);
+        masterName = caster.toString(arguments.get("masterName", ""), "");
+        sentinels = CacheUtil.toSet(caster.toString(arguments.get("sentinels", ""), "").split("\\r?\\n")); // TODO better
     }
 
     @Override
     protected Jedis _jedis() throws IOException {
-	if (pool == null) {
-	    pool = new JedisSentinelPool(masterName, sentinels, getJedisPoolConfig(), timeout, password);
-	}
-	return pool.getResource();
+        if (pool == null) {
+            pool = new JedisSentinelPool(masterName, sentinels, getJedisPoolConfig(), timeout, password);
+        }
+        return pool.getResource();
     }
 }
