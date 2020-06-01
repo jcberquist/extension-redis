@@ -45,11 +45,6 @@ public abstract class AbstractRedisCache implements Cache {
     private String namespace;
     private ClassLoader cl;
 
-    public void init(Config config, String[] cacheName, Struct[] arguments) {
-        // Not used at the moment
-        this.cl = config.getClass().getClassLoader();
-    }
-
     public void init(Struct arguments) throws IOException {
         this.cl = arguments.getClass().getClassLoader();
         timeout = caster.toIntValue(arguments.get("timeout", null), 2000);
