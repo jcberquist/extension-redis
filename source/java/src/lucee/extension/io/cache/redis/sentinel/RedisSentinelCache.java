@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.util.Set;
 
 import lucee.extension.io.cache.redis.AbstractRedisCache;
-import lucee.extension.io.cache.redis.RedisCacheUtils;
+import lucee.extension.io.cache.redis.CacheUtil;
 import lucee.runtime.config.Config;
 import lucee.runtime.type.Struct;
 import redis.clients.jedis.Jedis;
@@ -21,7 +21,7 @@ public class RedisSentinelCache extends AbstractRedisCache {
     public void init(Config config, String cacheName, Struct arguments) throws IOException {
 	super.init(arguments);
 	masterName = caster.toString(arguments.get("masterName", ""), "");
-	sentinels = RedisCacheUtils.toSet(caster.toString(arguments.get("sentinels", ""), "").split("\\r?\\n")); // TODO better
+	sentinels = CacheUtil.toSet(caster.toString(arguments.get("sentinels", ""), "").split("\\r?\\n")); // TODO better
     }
 
     @Override

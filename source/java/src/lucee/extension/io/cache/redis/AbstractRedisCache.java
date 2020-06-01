@@ -98,7 +98,7 @@ public abstract class AbstractRedisCache implements Cache {
 			throw new RuntimeException(e);// not throwing IOException because Lucee 4.5
 		}
 		finally {
-			RedisCacheUtils.close(conn);
+			close(conn);
 		}
 	}
 
@@ -156,7 +156,7 @@ public abstract class AbstractRedisCache implements Cache {
 			throw new RuntimeException(e);// not throwing IOException because Lucee 4.5
 		}
 		finally {
-			RedisCacheUtils.close(conn);
+			close(conn);
 		}
 	}
 
@@ -167,7 +167,7 @@ public abstract class AbstractRedisCache implements Cache {
 			return conn.exists(toKey(key));
 		}
 		finally {
-			RedisCacheUtils.close(conn);
+			close(conn);
 		}
 	}
 
@@ -178,7 +178,7 @@ public abstract class AbstractRedisCache implements Cache {
 			return conn.del(toKey(key)) > 0;
 		}
 		finally {
-			RedisCacheUtils.close(conn);
+			close(conn);
 		}
 	}
 
@@ -194,13 +194,13 @@ public abstract class AbstractRedisCache implements Cache {
 			return rtn.intValue();
 		}
 		finally {
-			RedisCacheUtils.close(conn);
+			close(conn);
 		}
 	}
 
 	@Override
 	public int remove(CacheEntryFilter filter) throws IOException {
-		if (CacheUtil.allowAll(filter)) return clear();
+		if (CacheUtil.allowAll(filter)) return remove((CacheKeyFilter) null);
 
 		List<String> keys = keys();
 		int count = 0;
@@ -225,7 +225,7 @@ public abstract class AbstractRedisCache implements Cache {
 			return _skeys(conn, (CacheKeyFilter) null);
 		}
 		finally {
-			RedisCacheUtils.close(conn);
+			close(conn);
 		}
 	}
 
@@ -240,7 +240,7 @@ public abstract class AbstractRedisCache implements Cache {
 			return _skeys(conn, filter);
 		}
 		finally {
-			RedisCacheUtils.close(conn);
+			close(conn);
 		}
 	}
 
@@ -286,7 +286,7 @@ public abstract class AbstractRedisCache implements Cache {
 			throw new RuntimeException(e);// not throwing IOException because Lucee 4.5
 		}
 		finally {
-			RedisCacheUtils.close(conn);
+			close(conn);
 		}
 	}
 
@@ -329,7 +329,7 @@ public abstract class AbstractRedisCache implements Cache {
 												// because it is much faster than the else solution
 				int i = 0;
 				for (byte[] val: values) {
-					list.add(new RedisCacheEntry(this, RedisCacheUtils.removeNamespace(namespace, new String(keys[i++], UTF8)).getBytes(UTF8), evaluate(val), val.length));
+					list.add(new RedisCacheEntry(this, removeNamespace(new String(keys[i++], UTF8)).getBytes(UTF8), evaluate(val), val.length));
 				}
 			}
 			else {
@@ -340,7 +340,7 @@ public abstract class AbstractRedisCache implements Cache {
 						val = conn.get(key);
 					}
 					catch (JedisDataException jde) {}
-					if (val != null) list.add(new RedisCacheEntry(this, RedisCacheUtils.removeNamespace(namespace, new String(key, UTF8)).getBytes(UTF8), evaluate(val), val.length));
+					if (val != null) list.add(new RedisCacheEntry(this, removeNamespace(new String(key, UTF8)).getBytes(UTF8), evaluate(val), val.length));
 				}
 			}
 			return list;
@@ -349,7 +349,7 @@ public abstract class AbstractRedisCache implements Cache {
 			throw new RuntimeException(e);// not throwing IOException because Lucee 4.5
 		}
 		finally {
-			RedisCacheUtils.close(conn);
+			close(conn);
 		}
 	}
 
@@ -383,6 +383,17 @@ public abstract class AbstractRedisCache implements Cache {
 		return InfoParser.parse(CacheUtil.getInfo(this), jedisSilent().info());// not throwing IOException because Lucee 4.5
 	}
 
+	public CacheEntry getQuiet(String key) throws IOException {
+		CacheEntry entry = getQuiet(key, null);
+		if (entry == null) throw new CacheException("there is no valid cache entry with key [" + key + "]");
+		return entry;
+	}
+
+	public CacheEntry getQuiet(String key, CacheEntry defaultValue) {
+		// TODO
+		return getCacheEntry(key, defaultValue);
+	}
+
 	private List<byte[]> _bkeys(Jedis conn, CacheKeyFilter filter) throws IOException {
 		boolean all = CacheUtil.allowAll(filter);
 		Set<byte[]> skeys = conn.keys(toKey("*"));
@@ -391,7 +402,7 @@ public abstract class AbstractRedisCache implements Cache {
 		byte[] key;
 		while (it.hasNext()) {
 			key = it.next();
-			if (all || filter.accept(RedisCacheUtils.removeNamespace(namespace, new String(key, UTF8)))) list.add(key);
+			if (all || filter.accept(removeNamespace(new String(key, UTF8)))) list.add(key);
 		}
 		return list;
 	}
@@ -404,39 +415,36 @@ public abstract class AbstractRedisCache implements Cache {
 		byte[] key;
 		while (it.hasNext()) {
 			key = it.next();
-			if (all || filter.accept(RedisCacheUtils.removeNamespace(namespace, new String(key, UTF8)))) list.add(RedisCacheUtils.removeNamespace(namespace, new String(key, UTF8)));
+			if (all || filter.accept(removeNamespace(new String(key, UTF8)))) list.add(removeNamespace(new String(key, UTF8)));
 		}
 		return list;
 	}
 
-	// CachePro interface @Override
-	public Cache decouple() {
-		return this;
-	}
-
-	public CacheEntry getQuiet(String key) throws IOException {
-		CacheEntry entry = getQuiet(key, null);
-		if (entry == null) throw new CacheException("there is no valid cache entry with key [" + key + "]");
-		return entry;
-	}
-
-	public CacheEntry getQuiet(String key, CacheEntry defaultValue) {
-		// TODO
-		return getCacheEntry(key, defaultValue);
-	}
-
-	public int clear() throws IOException {
-		return remove((CacheKeyFilter) null);
-	}
-
 	private byte[] toKey(String key) {
-		return RedisCacheUtils.addNamespace(namespace, key.trim().toLowerCase()).getBytes(UTF8);
+		return addNamespace(key.trim().toLowerCase()).getBytes(UTF8);
+	}
+
+	private String addNamespace(String key) {
+		if (namespace == null) return key;
+
+		if (key.startsWith(namespace.toLowerCase() + ":")) {
+			return key;
+		}
+
+		return namespace.toLowerCase() + ':' + key;
+	}
+
+	private String removeNamespace(String key) {
+		if (namespace != null && key.startsWith(namespace.toLowerCase())) {
+			return key.replace(namespace.toLowerCase() + ":", "");
+		}
+		return key;
 	}
 
 	private byte[][] toKeys(String[] keys) {
 		byte[][] arr = new byte[keys.length][];
 		for (int i = 0; i < keys.length; i++) {
-			arr[i] = RedisCacheUtils.addNamespace(namespace, keys[i].trim().toLowerCase()).getBytes(UTF8);
+			arr[i] = addNamespace(keys[i].trim().toLowerCase()).getBytes(UTF8);
 		}
 		return arr;
 	}
@@ -461,7 +469,7 @@ public abstract class AbstractRedisCache implements Cache {
 	}
 
 	private byte[] serialize(Object value) throws PageException {
-		try {
+	try {
 			ByteArrayOutputStream os = new ByteArrayOutputStream(); // returns
 			ObjectOutputStream oos = new ObjectOutputStream(os);
 			oos.writeObject(value);
@@ -490,21 +498,8 @@ public abstract class AbstractRedisCache implements Cache {
 		}
 	}
 
-	// CachePro interface @Override
-	public void verify() throws CacheException {
-		Jedis conn = null;
-		try {
-			conn = jedis();
-			String res = conn.ping();
-			if ("PONG".equals(res)) return;
+    protected void close(Jedis conn) {
+		if (conn != null) conn.close();
+    }
 
-			throw new CacheException("Could connect to Redis, but Redis did not answer to the ping as expected (response:" + res + ")");
-		}
-		catch (IOException e) {
-			new CacheException(e.getClass().getName() + ":" + e.getMessage());
-		}
-		finally {
-			RedisCacheUtils.close(conn);
-		}
-	}
 }
