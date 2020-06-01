@@ -372,7 +372,13 @@ public abstract class AbstractRedisCache implements Cache {
 
     @Override
     public Struct getCustomInfo() {
-        return InfoParser.parse(CacheUtil.getInfo(this), jedisSilent().info());// not throwing IOException because Lucee 4.5
+        Jedis conn = jedisSilent();
+        try {
+            return InfoParser.parse(CacheUtil.getInfo(this), conn.info());// not throwing IOException because Lucee 4.5
+        }
+        finally {
+            close(conn);
+        }
     }
 
     public CacheEntry getQuiet(String key) throws IOException {
