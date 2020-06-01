@@ -2,6 +2,7 @@ package lucee.extension.io.cache.redis;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.nio.charset.Charset;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -13,6 +14,7 @@ import java.util.Set;
 import lucee.commons.io.cache.Cache;
 import lucee.commons.io.cache.CacheEntry;
 import lucee.commons.io.cache.CacheKeyFilter;
+import lucee.commons.io.cache.CacheEntryFilter;
 import lucee.commons.io.cache.exp.CacheException;
 import lucee.extension.io.cache.util.ObjectInputStreamImpl;
 import lucee.loader.engine.CFMLEngine;
@@ -26,7 +28,9 @@ import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.jedis.exceptions.JedisDataException;
 
-public abstract class AbstractRedisCache extends CacheSupport {
+public abstract class AbstractRedisCache implements Cache {
+
+	public static final Charset UTF8 = Charset.forName("UTF-8");
 
 	protected CFMLEngine engine = CFMLEngineFactory.getInstance();
 	protected Cast caster = engine.getCastUtil();
@@ -70,9 +74,6 @@ public abstract class AbstractRedisCache extends CacheSupport {
 		if (maxTotal > 0) config.setMaxTotal(maxTotal);
 		if (maxIdle > 0) config.setMaxIdle(maxIdle);
 		if (minIdle > 0) config.setMinIdle(minIdle);
-		// config.setEvictionPolicyClassName();
-		// config.setFairness();
-		// config.setLifo();
 
 		return config;
 	}
@@ -102,6 +103,11 @@ public abstract class AbstractRedisCache extends CacheSupport {
 	}
 
 	@Override
+	public Object getValue(String key) throws IOException {
+		return getCacheEntry(key).getValue();
+	}
+
+	@Override
 	public CacheEntry getCacheEntry(String key, CacheEntry defaultValue) {
 		try {
 			return getCacheEntry(key);
@@ -109,6 +115,13 @@ public abstract class AbstractRedisCache extends CacheSupport {
 		catch (IOException e) {
 			return defaultValue;
 		}
+	}
+
+	@Override
+	public Object getValue(String key, Object defaultValue) {
+		CacheEntry entry = getCacheEntry(key, null);
+		if (entry == null) return defaultValue;
+		return entry.getValue();
 	}
 
 	@Override
@@ -169,16 +182,6 @@ public abstract class AbstractRedisCache extends CacheSupport {
 		}
 	}
 
-	public boolean remove(String[] keys) throws IOException {
-		Jedis conn = jedis();
-		try {
-			return conn.del(toKeys(keys)) > 0;
-		}
-		finally {
-			RedisCacheUtils.close(conn);
-		}
-	}
-
 	@Override
 	public int remove(CacheKeyFilter filter) throws IOException {
 		Jedis conn = jedisSilent();
@@ -193,6 +196,26 @@ public abstract class AbstractRedisCache extends CacheSupport {
 		finally {
 			RedisCacheUtils.close(conn);
 		}
+	}
+
+	@Override
+	public int remove(CacheEntryFilter filter) throws IOException {
+		if (CacheUtil.allowAll(filter)) return clear();
+
+		List<String> keys = keys();
+		int count = 0;
+		Iterator<String> it = keys.iterator();
+		String key;
+		CacheEntry entry;
+		while (it.hasNext()) {
+			key = it.next();
+			entry = getQuiet(key, null);
+			if (filter == null || filter.accept(entry)) {
+				remove(key);
+				count++;
+			}
+		}
+		return count;
 	}
 
 	@Override
@@ -221,28 +244,65 @@ public abstract class AbstractRedisCache extends CacheSupport {
 		}
 	}
 
-	private List<byte[]> _bkeys(Jedis conn, CacheKeyFilter filter) throws IOException {
+	@Override
+	public List<String> keys(CacheEntryFilter filter) throws IOException {
 		boolean all = CacheUtil.allowAll(filter);
-		Set<byte[]> skeys = conn.keys(toKey("*"));
-		List<byte[]> list = new ArrayList<byte[]>();
-		Iterator<byte[]> it = skeys.iterator();
-		byte[] key;
+
+		List<String> keys = keys();
+		List<String> list = new ArrayList<String>();
+		Iterator<String> it = keys.iterator();
+		String key;
+		CacheEntry entry;
 		while (it.hasNext()) {
 			key = it.next();
-			if (all || filter.accept(RedisCacheUtils.removeNamespace(namespace, new String(key, UTF8)))) list.add(key);
+			entry = getQuiet(key, null);
+			if (all || filter.accept(entry)) list.add(key);
 		}
 		return list;
 	}
 
-	private List<String> _skeys(Jedis conn, CacheKeyFilter filter) throws IOException {
-		boolean all = CacheUtil.allowAll(filter);
-		Set<byte[]> skeys = conn.keys(toKey("*"));
-		List<String> list = new ArrayList<String>();
-		Iterator<byte[]> it = skeys.iterator();
-		byte[] key;
+	@Override
+	public List values() throws IOException {
+		return values((CacheKeyFilter) null);
+	}
+
+	@Override
+	public List values(CacheKeyFilter filter) throws IOException {
+		Jedis conn = jedisSilent();
+
+		try {
+			List<byte[]> lkeys = _bkeys(conn, filter);
+			List<Object> list = new ArrayList<Object>();
+
+			if (lkeys == null || lkeys.size() == 0) return list;
+
+			List<byte[]> values = conn.mget(lkeys.toArray(new byte[lkeys.size()][]));
+			for (byte[] val: values) {
+				list.add(evaluate(val));
+			}
+			return list;
+		}
+		catch (PageException e) {
+			throw new RuntimeException(e);// not throwing IOException because Lucee 4.5
+		}
+		finally {
+			RedisCacheUtils.close(conn);
+		}
+	}
+
+	@Override
+	public List values(CacheEntryFilter filter) throws IOException {
+		if (CacheUtil.allowAll(filter)) return values();
+
+		List<String> keys = keys();
+		List<Object> list = new ArrayList<Object>();
+		Iterator<String> it = keys.iterator();
+		String key;
+		CacheEntry entry;
 		while (it.hasNext()) {
 			key = it.next();
-			if (all || filter.accept(RedisCacheUtils.removeNamespace(namespace, new String(key, UTF8)))) list.add(RedisCacheUtils.removeNamespace(namespace, new String(key, UTF8)));
+			entry = getQuiet(key, null);
+			if (filter.accept(entry)) list.add(entry.getValue());
 		}
 		return list;
 	}
@@ -293,47 +353,29 @@ public abstract class AbstractRedisCache extends CacheSupport {
 		}
 	}
 
-	// there was the wrong generic type defined in the older interface, because of that we do not define
-	// a generic type at all here, just to be sure
 	@Override
-	public List values() throws IOException {
-		return values((CacheKeyFilter) null);
-	}
-
-	// there was the wrong generic type defined in the older interface, because of that we do not define
-	// a generic type at all here, just to be sure
-	@Override
-	public List values(CacheKeyFilter filter) throws IOException {
-		Jedis conn = jedisSilent();
-
-		try {
-			List<byte[]> lkeys = _bkeys(conn, filter);
-			List<Object> list = new ArrayList<Object>();
-
-			if (lkeys == null || lkeys.size() == 0) return list;
-
-			List<byte[]> values = conn.mget(lkeys.toArray(new byte[lkeys.size()][]));
-			for (byte[] val: values) {
-				list.add(evaluate(val));
+	public List<CacheEntry> entries(CacheEntryFilter filter) throws IOException {
+		List<CacheEntry> entries = entries();
+		List<CacheEntry> list = new ArrayList<CacheEntry>();
+		Iterator<CacheEntry> it = entries.iterator();
+		CacheEntry entry;
+		while (it.hasNext()) {
+			entry = it.next();
+			if (entry != null && filter.accept(entry)) {
+				list.add(entry);
 			}
-			return list;
 		}
-		catch (PageException e) {
-			throw new RuntimeException(e);// not throwing IOException because Lucee 4.5
-		}
-		finally {
-			RedisCacheUtils.close(conn);
-		}
+		return list;
 	}
 
 	@Override
 	public long hitCount() {
-		return 0; // TODO To change body of implemented methods use File | Settings | File Templates.
+		return 0;
 	}
 
 	@Override
 	public long missCount() {
-		return 0; // TODO To change body of implemented methods use File | Settings | File Templates.
+		return 0;
 	}
 
 	@Override
@@ -341,35 +383,48 @@ public abstract class AbstractRedisCache extends CacheSupport {
 		return InfoParser.parse(CacheUtil.getInfo(this), jedisSilent().info());// not throwing IOException because Lucee 4.5
 	}
 
-	/*
-	 * private List entriesList(List keys) throws IOException { Jedis conn = jedis();
-	 * ArrayList<RedisCacheEntry> res = null;
-	 *
-	 * try { res = new ArrayList<RedisCacheEntry>(); Iterator<String> it = keys.iterator(); while
-	 * (it.hasNext()) { String k = it.next(); res.add(new RedisCacheEntry(this, new RedisCacheItem(k,
-	 * conn.get(k), settings.cacheName))); }
-	 *
-	 * } finally { RedisCacheUtils.close(conn); } return res; }
-	 */
+	private List<byte[]> _bkeys(Jedis conn, CacheKeyFilter filter) throws IOException {
+		boolean all = CacheUtil.allowAll(filter);
+		Set<byte[]> skeys = conn.keys(toKey("*"));
+		List<byte[]> list = new ArrayList<byte[]>();
+		Iterator<byte[]> it = skeys.iterator();
+		byte[] key;
+		while (it.hasNext()) {
+			key = it.next();
+			if (all || filter.accept(RedisCacheUtils.removeNamespace(namespace, new String(key, UTF8)))) list.add(key);
+		}
+		return list;
+	}
 
-	/*
-	 * private List<String> sanitizeKeys(List<String> keys) throws IOException { for (int i = 0; i <
-	 * keys.size(); i++) { keys.set(i, RedisCacheUtils.removeNamespace(settings.nameSpace,
-	 * keys.get(i))); } return keys; }
-	 */
+	private List<String> _skeys(Jedis conn, CacheKeyFilter filter) throws IOException {
+		boolean all = CacheUtil.allowAll(filter);
+		Set<byte[]> skeys = conn.keys(toKey("*"));
+		List<String> list = new ArrayList<String>();
+		Iterator<byte[]> it = skeys.iterator();
+		byte[] key;
+		while (it.hasNext()) {
+			key = it.next();
+			if (all || filter.accept(RedisCacheUtils.removeNamespace(namespace, new String(key, UTF8)))) list.add(RedisCacheUtils.removeNamespace(namespace, new String(key, UTF8)));
+		}
+		return list;
+	}
 
 	// CachePro interface @Override
 	public Cache decouple() {
 		return this;
 	}
 
-	@Override
+	public CacheEntry getQuiet(String key) throws IOException {
+		CacheEntry entry = getQuiet(key, null);
+		if (entry == null) throw new CacheException("there is no valid cache entry with key [" + key + "]");
+		return entry;
+	}
+
 	public CacheEntry getQuiet(String key, CacheEntry defaultValue) {
 		// TODO
 		return getCacheEntry(key, defaultValue);
 	}
 
-	@Override
 	public int clear() throws IOException {
 		return remove((CacheKeyFilter) null);
 	}

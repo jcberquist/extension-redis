@@ -42,7 +42,7 @@ public class RedisCacheEntry implements CacheEntry {
 
 	@Override
 	public String getKey() {
-		return new String(bkey, CacheSupport.UTF8);
+		return new String(bkey, AbstractRedisCache.UTF8);
 	}
 
 	@Override
