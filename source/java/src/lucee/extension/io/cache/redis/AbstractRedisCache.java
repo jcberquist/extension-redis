@@ -82,9 +82,6 @@ public abstract class AbstractRedisCache implements Cache {
 
             return new RedisCacheEntry(this, skey, evaluate(val), val.length);
         }
-        catch (PageException e) {
-            throw new RuntimeException(e);// not throwing IOException because Lucee 4.5
-        }
         finally {
             close(conn);
         }
@@ -125,7 +122,7 @@ public abstract class AbstractRedisCache implements Cache {
             }
             else if (idle != null) {
                 // note: if this cache is being used as a session store
-                // then idle will be passed in as -1 when a new session
+                // then idle might be passed in as -1 when a new session
                 // is created and first stored. Avoid setting `ex` in
                 // this case so we don't get a cache item without a TTL
                 // when the cache has a default TTL
@@ -141,7 +138,7 @@ public abstract class AbstractRedisCache implements Cache {
             }
         }
         catch (PageException e) {
-            throw new RuntimeException(e);// not throwing IOException because Lucee 4.5
+            throw new RuntimeException(e);
         }
         finally {
             close(conn);
@@ -173,7 +170,6 @@ public abstract class AbstractRedisCache implements Cache {
     @Override
     public int remove(CacheKeyFilter filter) throws IOException {
         Jedis conn = jedisSilent();
-
         try {
             List<byte[]> lkeys = _bkeys(conn, filter);
             if (lkeys == null || lkeys.size() == 0) return 0;
@@ -188,8 +184,7 @@ public abstract class AbstractRedisCache implements Cache {
 
     @Override
     public int remove(CacheEntryFilter filter) throws IOException {
-        if (CacheUtil.allowAll(filter)) return remove((CacheKeyFilter) null);
-
+        boolean all = CacheUtil.allowAll(filter);
         List<String> keys = keys();
         int count = 0;
         Iterator<String> it = keys.iterator();
@@ -198,7 +193,7 @@ public abstract class AbstractRedisCache implements Cache {
         while (it.hasNext()) {
             key = it.next();
             entry = getQuiet(key, null);
-            if (filter == null || filter.accept(entry)) {
+            if (all || filter.accept(entry)) {
                 remove(key);
                 count++;
             }
@@ -208,18 +203,8 @@ public abstract class AbstractRedisCache implements Cache {
 
     @Override
     public List<String> keys() throws IOException {
-        Jedis conn = jedis();
-        try {
-            return _skeys(conn, (CacheKeyFilter) null);
-        }
-        finally {
-            close(conn);
-        }
+        return keys((CacheKeyFilter) null);
     }
-
-    // private Set<String> _keys(Jedis conn) throws IOException {
-    // return conn.keys("*");
-    // }
 
     @Override
     public List<String> keys(CacheKeyFilter filter) throws IOException {
@@ -270,7 +255,7 @@ public abstract class AbstractRedisCache implements Cache {
             }
             return list;
         }
-        catch (PageException e) {
+        catch (Exception e) {
             throw new RuntimeException(e);// not throwing IOException because Lucee 4.5
         }
         finally {
@@ -313,8 +298,9 @@ public abstract class AbstractRedisCache implements Cache {
             byte[][] keys = lkeys.toArray(new byte[lkeys.size()][]);
 
             List<byte[]> values = conn.mget(keys);
-            if (keys.length == values.size()) { // because this is not atomar, it is possible that a key expired in meantime, but we try this way,
-                                                // because it is much faster than the else solution
+
+            // because this is not atomic, it is possible that a key expired since _bkeys()
+            if (keys.length == values.size()) {
                 int i = 0;
                 for (byte[] val: values) {
                     list.add(new RedisCacheEntry(this, fromJedisKey(keys[i++]), evaluate(val), val.length));
@@ -333,8 +319,8 @@ public abstract class AbstractRedisCache implements Cache {
             }
             return list;
         }
-        catch (PageException e) {
-            throw new RuntimeException(e);// not throwing IOException because Lucee 4.5
+        catch (Exception e) {
+            throw new RuntimeException(e);
         }
         finally {
             close(conn);
@@ -439,7 +425,7 @@ public abstract class AbstractRedisCache implements Cache {
         return key;
     }
 
-    private Object evaluate(byte[] data) throws PageException {
+    private Object evaluate(byte[] data) {
         ByteArrayInputStream bais = new ByteArrayInputStream(data);
         ObjectInputStream ois = null;
         try {
@@ -447,20 +433,28 @@ public abstract class AbstractRedisCache implements Cache {
             return ois.readObject();
         }
         catch (Exception e) {
-            try {
-                return new String(data, UTF8);
-            } catch ( Exception innerE ) {
-                throw CFMLEngineFactory.getInstance().getCastUtil().toPageException(e);
-            }
         }
         finally {
             Util.closeEL(ois);
         }
+
+        try {
+            return new String(data, UTF8);
+        }
+        catch( Exception e ) {
+        }
+
+        return data;
     }
 
     private byte[] serialize(Object value) throws PageException {
-    try {
-            ByteArrayOutputStream os = new ByteArrayOutputStream(); // returns
+        // for interop, just write strings directly
+        if (value instanceof String) {
+            return ((String) value).getBytes(UTF8);
+        }
+
+        try {
+            ByteArrayOutputStream os = new ByteArrayOutputStream();
             ObjectOutputStream oos = new ObjectOutputStream(os);
             oos.writeObject(value);
             oos.flush();
