@@ -65,14 +65,14 @@ component extends="Cache" {
 		)
 	];
 	public string function getClass() {
-		return "{class}";
+		return "lucee.extension.io.cache.redis.sentinel.RedisSentinelCache";
 	}
 
 	public string function getLabel() {
-		return "{label}";
+		return "Redis Sentinel driver";
 	}
 
 	public string function getDescription() {
-		return "{desc}";
+		return "Free and open source, high-performance, distributed memory object caching system, generic in nature, but intended for use in speeding up dynamic web applications by alleviating database load.";
 	}
 }
