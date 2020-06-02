@@ -1,35 +1,20 @@
 ## Lucee Redis Cache Extension
 
-The redis driver is based on Jedis. While this is a very robust driver and Redis is amazing this project has to be considered in Beta stage.
-Please provide your feedback.
+This is a fork of the official Lucee Redis extension: <https://github.com/lucee/extension-redis>
 
-### Installation
+I created it so that I could modify a few things from the official extension:
 
-Install the extension from the Lucee extension store in Lucee admin. Please note that the extension is installable only in the *server* admin.
-This means that is not possible to install it for a single web context.
+- Added support for defining a namespace (key prefix) for all keys stored in the cache. This makes it easier for
+  multiple caches to use the same Redis instance without clashing
+- Respect a cache put with an idle timeout (by setting a ttl on the key). This allows the cache to be used for Lucee
+  session storage without having the keys either last forever or expire according the the cache level ttl.
+- Avoid setting keys with no expiration when Lucee passes in an idle timeout of -1. This happens with older versions of
+  Lucee when a new session is created, which can result in certain situations
 
-### Create and configure the cache
+As the official extension is worked on, I may or may not maintain this to match, or just switch back to it.
 
-Create a new cache selecting Redis Cache as Type.
+### License
 
-Add some configuration:
-
-* If you like you can use the driver to store the Session Scope. If this is your intention you can flag "Allow to use this cache as client/session storage."
-* Server/Host => Tells Lucee how to connect to Redis. By default this is set to localhost:6379.
-Please tune this following your environment's needs. Note that the driver actually support a single Redis Server.
-* Namespace => choose the namespace that will be used to avoid keys name clashing between differents cache instances.
-
-All set. You are done.
-
-### Important
-
-* *Metadata*:
-    * The cache will return only the hits count for any single key.
-    * The general counter (missed, hits) for the cache instance itself are not updated
-
-* *idletime*:
-  Not supported. Any passed value will be ignored. Timespan is fully supported.
-
-
-
+The official repository does not currently carry a license, but other Lucee extensions are licensed via LGPLv2.1, so I
+have added that license here.
 
