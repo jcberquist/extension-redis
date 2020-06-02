@@ -1,4 +1,3 @@
-*.class
-*.classpath
 *.DS_Store
 dist/
+lib/
