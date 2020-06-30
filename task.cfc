@@ -34,10 +34,11 @@ component {
         }
         print.line().toConsole();
 
+        var cpSeparator = server.os.name.findNoCase( 'win' ) ? ';' : ':';
 
         command( '!javac' )
             .params( '-d', baseDir & 'dist/classes/' )
-            .params( '-cp', allJars.map( ( p ) => 'lib/' & p.listLast( '/' ) ).toList( ';' ) )
+            .params( '-cp', allJars.map( ( p ) => 'lib/' & p.listLast( '/' ) ).toList( cpSeparator ) )
             .params( '-source', '1.7' )
             .params( '-target', '1.7' )
             .params( '-g:lines,vars,source' )
