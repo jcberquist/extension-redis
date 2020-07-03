@@ -1,8 +1,8 @@
 {
     "description": "Redis cache extension",
-    "documentation": "https://raw.githubusercontent.com/jcberquist/extension-redis/master/README.md",
+    "documentation": "https://github.com/jcberquist/extension-redis/blob/master/README.md",
     "homepage": "https://github.com/jcberquist/extension-redis",
-    "location": "https://raw.githubusercontent.com/jcberquist/extension-redis/master/lucee-mariadb.zip",
+    "location": "https://github.com/jcberquist/extension-redis/releases/download/0.1.0/redis.cache.extension-0.1.0.lex",
     "name": "Redis cache extension",
     "slug": "96B79D83-D779-48C5-96D559FB63E94F47",
     "type": "lucee-extensions",
