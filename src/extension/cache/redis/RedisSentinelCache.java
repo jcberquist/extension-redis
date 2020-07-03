@@ -1,10 +1,8 @@
-package lucee.extension.io.cache.redis.sentinel;
+package extension.cache.redis;
 
 import java.io.IOException;
 import java.util.Set;
 
-import lucee.extension.io.cache.redis.AbstractRedisCache;
-import lucee.extension.io.cache.redis.CacheUtil;
 import lucee.runtime.config.Config;
 import lucee.runtime.type.Struct;
 import redis.clients.jedis.Jedis;

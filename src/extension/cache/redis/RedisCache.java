@@ -1,8 +1,7 @@
-package lucee.extension.io.cache.redis.simple;
+package extension.cache.redis;
 
 import java.io.IOException;
 
-import lucee.extension.io.cache.redis.AbstractRedisCache;
 import lucee.runtime.config.Config;
 import lucee.runtime.type.Struct;
 import redis.clients.jedis.Jedis;

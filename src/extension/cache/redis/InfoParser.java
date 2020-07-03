@@ -1,4 +1,4 @@
-package lucee.extension.io.cache.redis;
+package extension.cache.redis;
 
 import lucee.loader.engine.CFMLEngine;
 import lucee.loader.engine.CFMLEngineFactory;

@@ -1,4 +1,4 @@
-package lucee.extension.io.cache.redis;
+package extension.cache.redis;
 
 import java.lang.reflect.Method;
 import java.util.Set;

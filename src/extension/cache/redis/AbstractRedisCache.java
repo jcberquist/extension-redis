@@ -1,4 +1,4 @@
-package lucee.extension.io.cache.redis;
+package extension.cache.redis;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -16,7 +16,6 @@ import lucee.commons.io.cache.CacheEntry;
 import lucee.commons.io.cache.CacheKeyFilter;
 import lucee.commons.io.cache.CacheEntryFilter;
 import lucee.commons.io.cache.exp.CacheException;
-import lucee.extension.io.cache.util.ObjectInputStreamImpl;
 import lucee.loader.engine.CFMLEngine;
 import lucee.loader.engine.CFMLEngineFactory;
 import lucee.loader.util.Util;

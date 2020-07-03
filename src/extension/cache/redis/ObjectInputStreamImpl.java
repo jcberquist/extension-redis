@@ -1,4 +1,4 @@
-package lucee.extension.io.cache.util;
+package extension.cache.redis;
 
 import java.io.IOException;
 import java.io.InputStream;
