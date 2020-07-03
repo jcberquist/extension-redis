@@ -18,3 +18,14 @@ As the official extension is worked on, I may or may not maintain this to match,
 
 The official repository does not currently carry a license, but other Lucee extensions are licensed via LGPLv2.1, so I
 have added that license here.
+
+
+### Building the Extension
+
+Clone the repository to a new directory, and then via CommandBox, execute the task runner (`task.cfc`) in the repository
+root:
+
+```bash
+task run
+```
+Java does need to be on your path as the task runner uses the Java Compiler (`javac`).
