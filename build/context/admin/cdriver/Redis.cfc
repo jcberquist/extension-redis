@@ -20,9 +20,9 @@ component extends="Cache" {
         field(
             displayName = 'Namespace',
             name = 'namespace',
-            defaultValue = 'lucee:cache',
+            defaultValue = '',
             required = false,
-            description = 'Keys namespace. If using the same Redis instance for more than one cache use a unique namespace to avoid keys names clashing.'
+            description = 'Key namespace (prefix). If you are using the same Redis instance for more than one cache you can use a unique namespace to avoid key names clashing.'
         ),
         group( 'Authentication', 'Authentication Credentials if necessary.' ),
         field(
@@ -81,15 +81,15 @@ component extends="Cache" {
     ];
 
     public string function getClass() {
-        return 'lucee.extension.io.cache.redis.simple.RedisCache';
+        return 'extension.cache.redis.RedisCache';
     }
 
     public string function getLabel() {
-        return 'Redis driver';
+        return 'Redis';
     }
 
     public string function getDescription() {
-        return 'Free and open source, high-performance, distributed memory object caching system, generic in nature, but intended for use in speeding up dynamic web applications by alleviating database load.';
+        return 'Provides cache support for Redis. A fork of the official Lucee extension at [https://github.com/lucee/extension-redis].';
     }
 
 }
