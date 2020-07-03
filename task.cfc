@@ -3,6 +3,9 @@ component {
     property name="progressableDownloader" inject="ProgressableDownloader";
     property name="progressBar" inject="ProgressBar";
 
+    variables.bundleName = 'redis.cache.extension';
+    variables.cacheClasses = [ 'extension.cache.redis.RedisCache', 'extension.cache.redis.RedisSentinelCache' ];
+
     function run() {
         var baseDir = resolvePath( './' ).replace( '\', '/', 'all' );
         var boxJson = readBoxJson();
@@ -12,7 +15,16 @@ component {
         lex( baseDir, boxJson );
         clean( baseDir );
 
-        print.greenLine( 'All Done! Extension is at dist/redis.extension-#boxJson.version#.lex' ).toConsole();
+        print.greenLine( 'Extension is at dist/#bundleName#-#boxJson.version#.lex' ).toConsole();
+        print.aquaLine( 'Cache classes:' )
+
+        for ( var cache in expandCacheClasses( boxJson.version ) ) {
+            for ( var key in cache ) {
+                print.indentedAquaText( key & ': ' );
+                print.greenLine( '''' & cache[ key ] & '''' );
+            }
+            print.line();
+        }
     }
 
     function compile( baseDir, boxJson ) {
@@ -39,8 +51,8 @@ component {
         command( '!javac' )
             .params( '-d', baseDir & 'dist/classes/' )
             .params( '-cp', allJars.map( ( p ) => 'lib/' & p.listLast( '/' ) ).toList( cpSeparator ) )
-            .params( '-source', '1.7' )
-            .params( '-target', '1.7' )
+            .params( '-source', '1.8' )
+            .params( '-target', '1.8' )
             .params( '-g:lines,vars,source' )
             .params( argumentCollection = javaFiles )
             .run();
@@ -48,14 +60,16 @@ component {
         var manifest = {
             'Bundle-Version': '#boxJson.version#',
             'Built-Date': dateTimeFormat( now(), 'yyyy-mm-dd hh:nn:ss' ),
-            'Bundle-SymbolicName': 'redis.extension',
-            'Export-Package': 'lucee.extension.io.cache.redis.simple,lucee.extension.io.cache.redis.sentinel',
+            'Bundle-Name': 'Redis Cache Extension',
+            'Bundle-Description': 'Provides Redis cache support for Lucee 5.',
+            'Bundle-SymbolicName': bundleName,
+            'Export-Package': 'extension.cache.redis',
             'Bundle-ManifestVersion': '2',
             'Require-Bundle': requireBundle( boxJson )
         };
 
-        print.line( 'Creating lucee.extension.redis-#boxJson.version#.jar' ).toConsole();
-        jar( '#baseDir#dist/classes/', '#baseDir#dist/lex/jars/lucee.extension.redis-#boxJson.version#.jar', manifest );
+        print.line( 'Creating #bundleName#-#boxJson.version#.jar' ).toConsole();
+        jar( '#baseDir#dist/classes/', '#baseDir#dist/lex/jars/#bundleName#-#boxJson.version#.jar', manifest );
     }
 
     function lex( baseDir, boxJson ) {
@@ -72,19 +86,23 @@ component {
         print.indentedLine( 'Copying admin components...' ).toConsole();
         directoryCopy( baseDir & 'build/context/', baseDir & 'dist/lex/context/', true );
 
+        print.indentedLine( 'Copying extension image...' ).toConsole();
+        directoryCreate( baseDir & 'dist/lex/META-INF/', true, true );
+        fileCopy( baseDir & 'build/images/logo.png', baseDir & 'dist/lex/META-INF/logo.png' );
+
         var manifest = {
             'Built-Date': dateTimeFormat( now(), 'yyyy-mm-dd hh:nn:ss' ),
             'version': '"#boxJson.version#"',
             'id': '"#boxJson.slug#"',
-            'name': '"Redis driver"',
-            'description': '"Free and open source, high-performance, distributed memory object caching system, generic in nature, but intended for use in speeding up dynamic web applications by alleviating database load."',
+            'name': '"Redis Cache Extension"',
+            'description': '"Provides cache support for Redis. A fork of the official Lucee extension at [https://github.com/lucee/extension-redis]."',
             'start-bundles': 'false',
             'release-type': 'server',
-            'cache': '"[{''class'':''lucee.extension.io.cache.redis.simple.RedisCache'',''bundleName'':''redis.extension'',''bundleVersion'':''#boxJson.version#''},{''class'':''lucee.extension.io.cache.redis.sentinel.RedisSentinelCache'',''bundleName'':''redis.extension'',''bundleVersion'':''#boxJson.version#''}]"'
+            'cache': '"#serializeJSON( expandCacheClasses( boxJson.version ) ).replace( '"', '''', 'all' )#"'
         };
 
-        print.indentedLine( 'Zipping redis.extension-#boxJson.version#.lex' ).toConsole();
-        jar( '#baseDir#dist/lex/', '#baseDir#dist/redis.extension-#boxJson.version#.lex', manifest );
+        print.indentedLine( 'Zipping #bundleName#-#boxJson.version#.lex' ).toConsole();
+        jar( '#baseDir#dist/lex/', '#baseDir#dist/#bundleName#-#boxJson.version#.lex', manifest );
     }
 
 
@@ -157,6 +175,10 @@ component {
         var manifestArr = manifest.reduce( lineReducer, [ ] );
         manifestArr.prepend( 'Manifest-Version: 1.0' );
         return manifestArr.toList( chr( 10 ) ) & chr( 10 );
+    }
+
+    private function expandCacheClasses( bundleVersion ) {
+        return cacheClasses.map( ( cl ) => ( [ 'class': cl, 'bundleName': bundleName, 'bundleVersion': bundleVersion ] ) );
     }
 
     private function downloadFile( downloadURL, targetPath ) {
