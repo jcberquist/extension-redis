@@ -28,6 +28,7 @@ import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.jedis.exceptions.JedisDataException;
 
 public abstract class AbstractRedisCache implements Cache {
+    protected final Object TOKEN = new Object();
 
     public static final Charset UTF8 = Charset.forName("UTF-8");
 
@@ -157,8 +158,9 @@ public abstract class AbstractRedisCache implements Cache {
 
     @Override
     public boolean remove(String key) throws IOException {
-        Jedis conn = jedis();
+        Jedis conn = null;
         try {
+            conn = jedis();
             return conn.del(toJedisKey(key)) > 0;
         }
         finally {
@@ -207,8 +209,9 @@ public abstract class AbstractRedisCache implements Cache {
 
     @Override
     public List<String> keys(CacheKeyFilter filter) throws IOException {
-        Jedis conn = jedis();
+        Jedis conn = null;
         try {
+            conn = jedis();
             return _skeys(conn, filter);
         }
         finally {
@@ -464,13 +467,22 @@ public abstract class AbstractRedisCache implements Cache {
         }
     }
 
-    protected abstract Jedis jedis() throws IOException;
+    protected abstract Jedis _jedis() throws IOException;
+
+    protected Jedis jedis() throws IOException {
+        Jedis conn = _jedis();
+        if (!conn.isConnected()) conn.connect();
+        return conn;
+    }
 
     protected Jedis jedisSilent() {
+        Jedis conn = null;
         try {
-            return jedis();
+            conn = jedis();
+            return conn;
         }
         catch (Exception e) {
+            close(conn);
             throw new RuntimeException(e);
         }
     }

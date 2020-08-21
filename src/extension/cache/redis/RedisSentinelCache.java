@@ -23,9 +23,13 @@ public class RedisSentinelCache extends AbstractRedisCache {
     }
 
     @Override
-    protected Jedis jedis() throws IOException {
+    protected Jedis _jedis() throws IOException {
         if (pool == null) {
-            pool = new JedisSentinelPool(masterName, sentinels, getJedisPoolConfig(), timeout, password);
+            synchronized (TOKEN) {
+                if (pool == null) {
+                    pool = new JedisSentinelPool(masterName, sentinels, getJedisPoolConfig(), timeout, password);
+                }
+            }
         }
         return pool.getResource();
     }
