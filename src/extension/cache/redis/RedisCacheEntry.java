@@ -8,12 +8,12 @@ import lucee.runtime.type.Struct;
 
 public class RedisCacheEntry implements CacheEntry {
 
-    private final AbstractRedisCache cache;
+    private final RedisCache cache;
     private final String key;
     private final Object value;
     private final long size;
 
-    public RedisCacheEntry(AbstractRedisCache cache, String key, Object value, long size) {
+    public RedisCacheEntry(RedisCache cache, String key, Object value, long size) {
         this.cache = cache;
         this.key = key;
         this.value = value;

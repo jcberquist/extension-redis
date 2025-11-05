@@ -4,7 +4,7 @@ component {
     property name="progressBar" inject="ProgressBar";
 
     variables.bundleName = 'redis.cache.extension';
-    variables.cacheClasses = [ 'extension.cache.redis.RedisCache', 'extension.cache.redis.RedisSentinelCache' ];
+    variables.cacheClasses = [ 'extension.cache.redis.RedisCache' ];
 
     function run() {
         var baseDir = resolvePath( './' ).replace( '\', '/', 'all' );
@@ -51,8 +51,7 @@ component {
         command( '!javac' )
             .params( '-d', baseDir & 'dist/classes/' )
             .params( '-cp', allJars.map( ( p ) => 'lib/' & p.listLast( '/' ) ).toList( cpSeparator ) )
-            .params( '-source', '1.8' )
-            .params( '-target', '1.8' )
+            .params( '--release', '11' )
             .params( '-g:lines,vars,source' )
             .params( argumentCollection = javaFiles )
             .run();

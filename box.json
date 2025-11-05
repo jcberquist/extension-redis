@@ -9,12 +9,12 @@
     "version": "0.2.0",
     "jars": {
         "compile": [
-            "https://cdn.lucee.org/lucee-light-5.3.6.61.jar",
-            "https://repo1.maven.org/maven2/javax/servlet/jsp/javax.servlet.jsp-api/2.3.3/javax.servlet.jsp-api-2.3.3.jar"
+            "https://repo1.maven.org/maven2/javax/servlet/jsp/javax.servlet.jsp-api/2.3.3/javax.servlet.jsp-api-2.3.3.jar",
+            "https://cdn.lucee.org/lucee-light-6.2.3.35.jar"
         ],
         "dist": [
-            "https://repo1.maven.org/maven2/redis/clients/jedis/3.3.0/jedis-3.3.0.jar",
-            "https://repo1.maven.org/maven2/org/apache/commons/commons-pool2/2.6.2/commons-pool2-2.6.2.jar"
+            "https://repo1.maven.org/maven2/redis/clients/jedis/3.10.0/jedis-3.10.0.jar",
+            "https://repo1.maven.org/maven2/org/apache/commons/commons-pool2/2.12.1/commons-pool2-2.12.1.jar"
         ]
     }
 }
